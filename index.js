@@ -1,3 +1,4 @@
+/*
 const express = require('express')
 const path = require('path')
 const PORT = process.env.PORT || 5000
@@ -8,45 +9,29 @@ express()
   .set('view engine', 'ejs')
   .get('/', (req, res) => res.render('pages/index'))
   .listen(PORT, () => console.log(`Listening on ${ PORT }`))
+*/
 
 
+'use strict';
 
-
-const HTTP_SERVER_PORT = 8887; 
 const XCTL_SERVER_IP = '121.134.7.206'
 const XCTL_SERVER_PORT = '5050';
 
-// 암호화 모듈
-const crypto = require('crypto');
 
-// 웹서버 모듈 (의존모듈들 없는것을 설치)
-var https = require('https');
+const express = require('express');
+const SocketServer = require('ws').Server;
+const path = require('path');
 
-// 파일 시스템 모듈
-var fs = require('fs');
+const PORT = process.env.PORT || 8887;
+const INDEX = path.join(__dirname, 'index.html');
+
+const server = express()
+  .use((req, res) => res.sendFile(INDEX) )
+  .listen(PORT, () => console.log(`Listening on ${ PORT }`));
+
+const wss = new SocketServer({ server });
 
 
-//  웹서버 생성
-var httpsServer = https.createServer( function(request, response) {
-	console.log(new Date() + ' : nodejs page : test');
-    console.log((new Date()) + ' Received request for ' + request.url);
-    response.writeHead(404);
-    response.end();
-});
-
-// 포트설정
-httpsServer.listen(HTTP_SERVER_PORT, () => {
-	console.log(new Date() + ' : Server running at');
-});
-
-// 소켓 모듈 (XCTL 연동용)
-var net = require('net'); 
-
-// 웹소켓 서버 생성
-var wss = new WebSocketServer({
-    server: httpsServer,
-    autoAcceptConnections: false
-});
 
 // 웹소켓 연결 이벤트 등록
 var indexWeb = wss.on('connection', function(ws, req) {
@@ -78,6 +63,24 @@ var indexWeb = wss.on('connection', function(ws, req) {
 	});
 
 	ws.on('message', function incoming(message) {
+		console.log(new Date() + ' : UI -> Nodejs : ' + message)
+		
+		// 암호화 SHA512
+		if(message.split('_')[0] == 'CLIENT') {
+			
+			var pushMap = '';
+			
+			for(var i in message.split('_')) {				
+				if( i == 5 ){
+					pushMap += crypto.createHash('sha512').update( message.split('_')[5] ).digest('hex');
+				}else{
+					pushMap += message.split('_')[i] + '_';
+				}				
+			}
+			
+			message = pushMap;
+		}
+
 		console.log(new Date() + ' : Nodejs -> XCTL : ' + message)
 		ws.xClient.write(message);
 	});
